@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebAuthn Passkey Example</title>
+</head>
+<body>
+  <h1>WebAuthn Passkey Example</h1>
+  <button id="register">Register</button>
+  <button id="login">Login</button>
+  <script>
+    const serverURL = 'http://localhost:3000';
+
+    async function register() {
+      const { options, userID } = await (await fetch(`${serverURL}/register`)).json();
+      const publicKey = {
+        ...options,
+        challenge: Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+        user: {
+          ...options.user,
+          id: Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+        },
+      };
+
+
+      const credential = await navigator.credentials.create({ publicKey });
+
+      const credentialJSON = {
+        id: credential.id,
+        rawId: btoa(String.fromCharCode.apply(null, new Uint8Array($1))),
+        type: credential.type,
+        response: {
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
+        },
+      };
+
+      const result = await fetch(`${serverURL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userID, credential: credentialJSON }),
+      });
+
+      console.log(await result.json());
+    }
+
+    async function login() {
+      const userID = prompt('Enter your user ID:');
+      const { options } = await (await fetch(`${serverURL}/login?userID=${userID}`)).json();
+      const publicKey = options;
+
+      const credential = await navigator.credentials.get({ publicKey });
+
+      const credentialJSON = {
+        id: credential.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+        type: credential.type,
+        response: {
+          authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
+          signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
+          userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null,
+        },
+      };
+
+      const result = await fetch(`${serverURL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userID, credential: credentialJSON }),
+      });
+
+      console.log(await result.json());
+    }
+
+    document.getElementById('register').addEventListener('click', register);
+    document.getElementById('login').addEventListener('click', login);
+  </script>
+</body>
+</html>
+
